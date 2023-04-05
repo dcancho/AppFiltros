@@ -8,6 +8,7 @@ namespace AppFiltros
 {
     public class Image
     {
+        #region Fields and Constructors
         public byte[,] Pixels { get; set; }
         public byte Width { get; set; }
         public byte Height { get; set; }
@@ -15,7 +16,7 @@ namespace AppFiltros
         {
             Width = width;
             Height = height;
-            Pixels = new T[width, height];
+            Pixels = new byte[width, height];
         }
         public Image(byte[,] matrix)
         {
@@ -34,6 +35,8 @@ namespace AppFiltros
                 Pixels[x, y] = value;
             }
         }
+        #endregion
+
         public void ApplyFilter(Filter filter, bool applyRescaling = false)
         {
             int[,] resultMatrix = new int[Width, Height];
@@ -54,7 +57,7 @@ namespace AppFiltros
                     }
                 }
             }
-            if(applyRescaling)
+            if(applyRescaling && maxValue > 255 || minValue < 0)
             {
                 Pixels = ApplyLinearTransform(resultMatrix, maxValue, minValue);
             }
@@ -62,10 +65,7 @@ namespace AppFiltros
             {
                 Pixels = TrunkValues(resultMatrix);
             }
-
-
         }
-
         private static byte[,] TrunkValues(int[,] matrix, int maxValue = 255, int minValue=0)
         {
             byte[,] result = new byte[matrix.GetLength(0), matrix.GetLength(1)];
@@ -73,56 +73,61 @@ namespace AppFiltros
             {
                 for (int j = 0; j < matrix.GetLength(1); j++)
                 {
-                    if (matrix[i,j] > maxValue)
+                    if (matrix[i, j] > maxValue)
                     {
-                        matrix[i,j] = maxValue;
+                        result[i, j] = (byte)maxValue;
                     }
-                    else if (matrix[i,j] < minValue)
+                    else if (matrix[i, j] < minValue)
                     {
-                        matrix[i,j] = minValue;
+                        result[i, j] = (byte)minValue;
                     }
                     else
                     {
-                        result[i,j] = (byte)matrix[i,j];
+                        result[i, j] = (byte)matrix[i, j];
                     }
-
                 }
             }
             return result;
         }
-        private static byte[,] ApplyLinearTransform(int[,] matrix, int matrixMaxValue, int matrixMinValue)
+        private static byte[,] ApplyLinearTransform(int[,] matrix, int matrixMaxValue, int matrixMinValue, byte MaxValue = 255, byte MinValue = 0)
         {
             int numRows = matrix.GetLength(0);
             int numCols = matrix.GetLength(1);
-
             byte[,] result = new byte[numRows, numCols];
-            double scalingFactor = 255.0 / (matrixMaxValue - matrixMinValue);
-            for (int i = 0; i < numRows; i++)
+
+            if (matrixMaxValue == matrixMinValue)
             {
-                for (int j = 0; j < numCols; j++)
+                throw new ArgumentException("Max and min values are the same");
+            }
+            else
+            {
+                double scalingFactor = (MaxValue - MinValue) / (double)(matrixMaxValue - matrixMinValue);
+
+                for (int i = 0; i < numRows; i++)
                 {
-                    int val = matrix[i, j];
-                    int transformedVal = (int)(scalingFactor * (val - matrixMinValue));
-                    transformedVal = Math.Max(0, Math.Min(255, transformedVal));
-                    result[i, j] = (byte)transformedVal;
+                    for (int j = 0; j < numCols; j++)
+                    {
+                        int val = matrix[i, j];
+                        int transformedVal = (int)(scalingFactor * (val - matrixMinValue));
+                        transformedVal = Math.Max(MinValue, Math.Min(MaxValue, transformedVal));
+                        result[i, j] = (byte)transformedVal;
+                    }
                 }
             }
+
             return result;
         }
-
-
         public void Print()
         {
             for (int i = 0; i < Height; i++)
             {
                 for (int j = 0; j < Width; j++)
                 {
-                    Console.Write(Pixels[i, j]);
+                    Console.Write(Pixels[i, j]+"\t");
                 }
                 Console.Write("\n");
             }
         }
-
         private int CalculatePixel(Filter filter, byte x, byte y)
         {
             byte[,] bytes = ExtractMatrix(filter.MaskSize, x, y);
@@ -135,18 +140,15 @@ namespace AppFiltros
                     sum += bytes[i, j] * filter[i, j];
                 }
             }
-            sum *= (int)Math.Round(sum * filter.Factor);
+            sum = (int)Math.Round(sum * filter.Factor);
             return sum;
 
         }
-
         private byte[,] ExtractMatrix(byte maskSize, byte x, byte y)
         {
-
             byte[,] bytes = new byte[maskSize, maskSize];
-
-            int startX = x - maskSize / 2;
-            int startY = y - maskSize / 2;
+            int startX = (int)Math.Round(((double)x - maskSize / 2),MidpointRounding.ToPositiveInfinity);
+            int startY = (int)Math.Round(((double)y - maskSize / 2), MidpointRounding.ToPositiveInfinity);
 
             for (int i = 0; i < maskSize; i++)
             {
