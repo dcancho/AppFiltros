@@ -18,21 +18,15 @@ namespace AppFiltros
             }
             };
             Filter filter = new(3, new float[,]
-        {
+            {
                 {1,1,1},
                 {1,1,1},
                 {1,1,1}
-            }, true, (float)1/9);
+            }, true, (float)1 / 9);
             myImage.Print();
-            Image result = filter.ApplyFilter(myImage,false);
+            Image result = filter.ApplyFilter(myImage, false);
             Console.WriteLine("\n");
             result.Print();
-            //Print amount of RAM and CPU usage
-            Console.WriteLine($"\nRAM: {GC.GetTotalMemory(false)} bytes");
-            Console.WriteLine($"CPU: {Process.GetCurrentProcess().TotalProcessorTime}");
-
-
-
             #endregion
         }
 
