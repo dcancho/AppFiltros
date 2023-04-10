@@ -1,33 +1,39 @@
-﻿namespace AppFiltros
+﻿using System.Diagnostics;
+namespace AppFiltros
 {
     internal class Program
     {
         static void Main(string[] args)
         {
-            //Declare an image object
-            Image myImage = new Image(5, 5);
-            //initialize explicitely the image
-            myImage.Pixels = new byte[,]
+            #region Test de mediana
+            Image myImage = new(5, 7, 0)
             {
-                {0,4,5,5,5 },
-                {4,4,5,7,5 },
-                {4,4,5,5,5 },
-                {0,4,5,5,5 },
-                {4,4,5,7,5 }
+                Pixels = new byte[,]
+            {
+                {2,2,2,3,3},
+                {2,6,2,3,0},
+                {3,3,3,5,5},
+                {2,2,2,4,4},
+                {2,7,2,4,0}
+            }
             };
-            //Create a filter
-            Filter filter = new Filter(3, new sbyte[,]
+            Filter filter = new(3, new float[,]
         {
-                {1,2,1},
-                {2,4,2},
-                {1,2,1}
-            });
-            //Print the matrix
+                {1,1,1},
+                {1,1,1},
+                {1,1,1}
+            }, true, (float)1/9);
             myImage.Print();
-            //Apply the filter
-            myImage.ApplyFilter(filter);
-            Console.WriteLine("\n\n\n");
-            myImage.Print();
+            Image result = filter.ApplyFilter(myImage,false);
+            Console.WriteLine("\n");
+            result.Print();
+            //Print amount of RAM and CPU usage
+            Console.WriteLine($"\nRAM: {GC.GetTotalMemory(false)} bytes");
+            Console.WriteLine($"CPU: {Process.GetCurrentProcess().TotalProcessorTime}");
+
+
+
+            #endregion
         }
 
     }
