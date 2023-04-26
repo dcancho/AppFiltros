@@ -91,7 +91,7 @@ namespace AppFiltros
             return output;
         }
 
-        private static Layer _extractValuesToLayer(Rgba32[,] image, int type)
+        private static Layer ExtractValuesToLayer(Rgba32[,] image, int type)
         {
             ValueType layerType;
             switch (type)
@@ -148,7 +148,7 @@ namespace AppFiltros
                 Layer[] extractedLayers = new Layer[pixels.Length];
                 for (int i = 0; i < 4; i++)
                 {
-                    extractedLayers[i] = _extractValuesToLayer(pixels,i);
+                    extractedLayers[i] = ExtractValuesToLayer(pixels,i);
                 }
                 if(!color)
                 {
@@ -162,17 +162,20 @@ namespace AppFiltros
             }
             return new Image(layers);
         }
-        static public void WriteImage(Image image, string path)
+        public static void WriteImage(Image image, string path)
         {
             Image<Rgba32> resultImage = new((int)image.Columns, (int)image.Rows);
             for (uint i = 0; i < image.Rows; i++)
             {
                 for (uint j = 0; j < image.Columns; j++)
                 {
-                    resultImage[(int)i,(int) j] = new Rgba32(image[0][i, j], image[1][i, j], image[2][i, j], image[3][i, j]);
+                    resultImage[(int)j,(int)i] = image.LayerDepth > 1
+                        ? new Rgba32(image[0][i, j], image[1][i, j], image[2][i, j], 255)
+                        : new Rgba32(image[0][i, j], image[0][i, j], image[0][i, j], 255);
+
                 }
             }
-            resultImage.Save(path);
+            resultImage.SaveAsPng(path);
         }
     }
 }
