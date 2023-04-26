@@ -6,26 +6,24 @@ namespace AppFiltros
     {
         static void Main(string[] args)
         {
-            //new log file
             //start counting time elapsed
             var watch = Stopwatch.StartNew();
-            #region Test de mediana
-            string path = "cyno.png";
-            //string path = @"C:\Users\Diego\Pictures\Screenshots\002.png";
-            Image myImage = FileIO.GetImage(path);
-            Filter filter = new(3, new float[,]
+            Console.WriteLine("Path of input file: ");
+            string path = "" + Console.ReadLine();
+            Image myImage = FileIO.GetImage(path,true);
+            Filter filter = new(5, new float[,]
             {
-                {1,1,1},
-                {1,-8,1},
-                {1,1,1}
-            },false, 1);
-            //myImage.Print();
+                {1,1,1,1,1},
+                {1,1,1,1,1},
+                {1,1,1,1,1},
+                {1,1,1,1,1},
+                {1,1,1,1,1}
+            },true, (float)(1.0/25.0));
             Image result = filter.ApplyFilter(myImage, false);
             Console.WriteLine("\n");
-            //result.Print();
-            FileIO.WriteImage(result);
-            #endregion
-
+            Console.WriteLine("Path of output file: ");
+            string outputPath = "" + Console.ReadLine();
+            FileIO.WriteImage(result,outputPath);
             //Print resources used
             Console.WriteLine($"Memory used: {Process.GetCurrentProcess().WorkingSet64 / 1024} KB");
             //Print time elapsed

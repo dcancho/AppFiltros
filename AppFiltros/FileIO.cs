@@ -1,5 +1,6 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Data;
 using System.Threading.Tasks;
 
 namespace AppFiltros
@@ -20,6 +21,7 @@ namespace AppFiltros
         /// <returns></returns>
         private static Rgba32[,] _readPixelValues(Image<Rgba32> image)
         {
+            int remainingPixels = image.Height * image.Width;
             int processorsCount = Environment.ProcessorCount;
             int rowsPerThread = image.Height / processorsCount;
             Rgba32[,] pixels = new Rgba32[image.Height, image.Width];
@@ -37,8 +39,10 @@ namespace AppFiltros
                         {
                             lock (lockObject)
                             {
-                                pixels[i, j] = image[i, j];
+                                pixels[i, j] = image[j,i];
                             }
+                            //remainingPixels--;
+                            //Console.WriteLine($"Loading: {remainingPixels} remaining");
                         }
                     }
                 });
@@ -51,101 +55,124 @@ namespace AppFiltros
             return pixels;
         }
 
-        static public Image GetImage(string path, bool color)
+        private static Layer ToBlackWhite(Layer[] layers)
         {
-            Image output;
-            using (Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(path))
-            {
-                Rgba32[,] pixels = _readPixelValues(image);
-
-
-            }
-            return output;
-        }
-        static public Image GetImage(string path)
-        {
-            int numThreads = Environment.ProcessorCount;
-            Bitmap sourceImage = new(path);
-            Console.WriteLine($"Size of imported image is: {sourceImage.Height}{sourceImage.Width}");
-            //int totalPixels = sourceImage.Height * sourceImage.Width;
-            //int totalRemaining = totalPixels;
-            //Get values from the image
-            int width = sourceImage.Width;
-            int height = sourceImage.Height;
-            Image image = new Image(height, width);
-            Console.WriteLine($"Image created. Size is: {height}x{width}");
-
-            // Create an array of threads
-            Thread[] threads = new Thread[numThreads];
-
-            // Calculate the number of rows each thread will process
-            int rowsPerThread = image.Rows / numThreads;
-
-            // Create a lock object
+            Layer output = new Layer(ValueType.Grayscale, layers[0].Rows, layers[0].Columns);
+            Thread[] threads= new Thread[Environment.ProcessorCount];
+            uint numThread = (uint)threads.GetLength(0);
+            uint rowsPerThread = (uint)layers[0].Rows / numThread;
             object lockObject = new object();
-
-            // Create and start a thread for each processor
-            for (int t = 0; t < numThreads; t++)
+            for (int t = 0; t < numThread; t++)
             {
-                int startRow = t * rowsPerThread;
-                int endRow = (t == numThreads - 1) ? image.Rows : startRow + rowsPerThread;
+                uint startRow = (uint)t * rowsPerThread;
+                uint endRow = (t == numThread - 1) ? (uint)layers[0].Rows : startRow + rowsPerThread;
                 threads[t] = new Thread(() =>
                 {
-                    for (int i = startRow; i < endRow; i++)
+                    for (uint i = startRow; i < endRow; i++)
                     {
-                        for (int j = 0; j < image.Columns; j++)
+                        for (uint j = 0; j < layers[0].Columns; j++)
                         {
-                            //Console.WriteLine($"Thread {t}: At position {i},{j} of Image");
-                            Color pixelColor;
                             lock (lockObject)
                             {
-                                pixelColor = sourceImage.GetPixel(j, i);
+                                output[(uint)i, (uint)j] = (byte)((layers[0][i, j] + layers[1][i, j] + layers[2][i, j])/3);
                             }
-                            //Console.WriteLine($"Color is {pixelColor}");
-                            //Get the color components
-                            int red = pixelColor.R;
-                            int green = pixelColor.G;
-                            int blue = pixelColor.B;
-                            //Assign equivalence in gray to image[i,j]
-                            image[i, j] = Convert.ToByte((red + green + blue) / 3);
-                            //Console.WriteLine($"Converted value is {image[i, j]}");
-                            //totalRemaining -= 1;
-                            //Console.WriteLine($"Loading: Remaining: {totalRemaining}");
                         }
                     }
                 });
                 threads[t].Start();
             }
 
-            // Wait for all threads to complete
+
             foreach (Thread thread in threads)
             {
                 thread.Join();
             }
-            //is image null?
-            if (image == null)
-            {
-                Console.WriteLine("Image is null");
-            }
-            else
-            {
-                Console.WriteLine("Image is not null");
-            }
-            return image;
+
+            return output;
         }
-        static public void WriteImage(Image image)
+
+        private static Layer _extractValuesToLayer(Rgba32[,] image, int type)
         {
-            Bitmap resultImage = new(image.Columns, image.Rows);
-            for (int i = 0; i < image.Rows; i++)
+            ValueType layerType;
+            switch (type)
             {
-                for (int j = 0; j < image.Columns; j++)
+                case 0:
+                    layerType = ValueType.R;
+                    break;
+                case 1:
+                    layerType = ValueType.G;
+                    break;
+                case 2:
+                    layerType = ValueType.B;
+                    break;
+                case 3:
+                    layerType = ValueType.A;
+                    break;
+                default:
+                    layerType = ValueType.R;
+                    break;
+            }
+            byte[,] bytes = new byte[image.GetLength(0), image.GetLength(1)];
+            for (int i = 0; i < image.GetLength(0); i++)
+            {
+                for (int j = 0; j < image.GetLength(1); j++)
                 {
-                    byte gray = image[i, j];
-                    Color pixelColor = Color.FromArgb(gray, gray, gray);
-                    resultImage.SetPixel(j, i, pixelColor);
+                    switch (layerType)
+                    {
+                        case ValueType.R:
+                            bytes[i, j] = image[i, j].R;
+                            break;
+                        case ValueType.G:
+                            bytes[i, j] = image[i, j].G;
+                            break;
+                        case ValueType.B:
+                            bytes[i, j] = image[i, j].B;
+                            break;
+                        case ValueType.A:
+                            bytes[i, j] = image[i, j].A;
+                            break;
+                        default:
+                            bytes[i, j] = image[i, j].R;
+                            break;
+                    }
                 }
             }
-            resultImage.Save("filtered_cyno.png");
+            return new Layer(layerType, bytes);
+        }
+        static public Image GetImage(string path, bool color)
+        {
+            Layer[] layers;
+            using (Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(path))
+            {
+                Rgba32[,] pixels = _readPixelValues(image);
+                Layer[] extractedLayers = new Layer[pixels.Length];
+                for (int i = 0; i < 4; i++)
+                {
+                    extractedLayers[i] = _extractValuesToLayer(pixels,i);
+                }
+                if(!color)
+                {
+                    layers = new Layer[1];
+                    layers[0] = ToBlackWhite(extractedLayers);
+                }
+                else
+                {
+                    layers = extractedLayers;
+                }
+            }
+            return new Image(layers);
+        }
+        static public void WriteImage(Image image, string path)
+        {
+            Image<Rgba32> resultImage = new((int)image.Columns, (int)image.Rows);
+            for (uint i = 0; i < image.Rows; i++)
+            {
+                for (uint j = 0; j < image.Columns; j++)
+                {
+                    resultImage[(int)i,(int) j] = new Rgba32(image[0][i, j], image[1][i, j], image[2][i, j], image[3][i, j]);
+                }
+            }
+            resultImage.Save(path);
         }
     }
 }

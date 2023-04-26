@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -71,18 +72,14 @@ namespace AppFiltros
         /// </summary>
         public byte LayerDepth { get; set; }
         /// <summary>
-        /// Objetos Layer contenidos
+        /// Objetos Layer contenidos en la imagen.
         /// </summary>
         public Layer[] Layers { get; set; }
         /// <summary>
-        /// Matriz que contiene los pixeles de la imagen
-        /// </summary>
-        public byte[,] Pixels { get; set; }
-        /// <summary>
         /// Dimensión de la imagen
         /// </summary>
-        public int Rows { get; set; }
-        public int Columns { get; set; }
+        public uint Rows { get; set; }
+        public uint Columns { get; set; }
         /// <summary>
         /// Valor máximo admitido por pixel
         /// </summary>
@@ -91,39 +88,38 @@ namespace AppFiltros
         /// Valor mínimo admitido por pixel
         /// </summary>
         public byte MinValue { get; set; }
-        public Image(int height, int width, byte maxValue = 255, byte minValue = 0)
+        public Image(Layer[] layers, byte maxValue = 255, byte minValue = 0)
         {
-            Rows = height;
-            Columns = width;
-            Pixels = new byte[Rows, Columns];
-            MaxValue = maxValue;
-            MinValue = minValue;
-        }
-        public Image(byte[,] matrix, byte maxValue = 255, byte minValue = 0)
-        {
-            Rows = matrix.GetLength(0);
-            Columns = matrix.GetLength(1);
-            Pixels = matrix;
+            Rows = layers[0].Rows;
+            Columns = layers[0].Columns;
+            LayerDepth = (byte)layers.GetLength(0);
+            Layers = layers;
             MaxValue = maxValue;
             MinValue = minValue;
         }
         /// <summary>
         /// x: Rows
         /// y: Columns
+        /// z: Layer
         /// </summary>
         /// <param name="x"></param>
         /// <param name="y"></param>
         /// <returns></returns>
-        public byte this[int x, int y]
+        public byte this[int x, int y, int z]
         {
             get
             {
-                return Pixels[x, y];
+                return Layers[z].Pixels[x, y];
             }
             set
             {
-                Pixels[x, y] = (byte)value;
+                Layers[z].Pixels[x, y] = value;
             }
+        }
+        public Layer this[int i]
+        {
+            set { Layers[i] = value; }
+            get { return Layers[i]; }
         }
 
         /// <summary>
@@ -144,7 +140,7 @@ namespace AppFiltros
                 {
                     result[i, j] = (byte)(Math.Round(matrix[i, j]) % maxValue);
 #if DEBUG
-					Console.WriteLine($"Truncating: Modulo of {matrix[i, j]} by {maxValue} is {result[i, j]}");
+					//Console.WriteLine($"Truncating: Modulo of {matrix[i, j]} by {maxValue} is {result[i, j]}");
 #endif
                 }
             }
@@ -211,20 +207,6 @@ namespace AppFiltros
                 }
             }
             return result;
-        }
-        /// <summary>
-        /// Imprime la imagen en consola.
-        /// </summary>
-        public void Print()
-        {
-            for (int i = 0; i < Rows; i++)
-            {
-                for (int j = 0; j < Columns; j++)
-                {
-                    Console.Write(Pixels[i, j] + "\t");
-                }
-                Console.Write("\n");
-            }
         }
     }
 }

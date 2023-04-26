@@ -49,21 +49,20 @@ namespace AppFiltros
         /// <param name="sourceImage">Imagen a procesar.</param>
         /// <param name="applyRescaling">Indica si se aplica el reescalado linear. Verdadero por defecto. Caso contrario, se trunca usando el módulo</param>
         /// <returns></returns>
-        public Image ApplyFilter(Image sourceImage, bool applyRescaling = true)
+        public Layer ApplyFilter(Layer layer, bool applyRescaling = true, byte maxPixelValue = 255, byte minPixelValue = 0)
         {
-            int totalPixels = sourceImage.Rows * sourceImage.Columns;
-            int totalRemaining = totalPixels;
-            int numThreads = Environment.ProcessorCount;
-            float[,] resultMatrix = new float[sourceImage.Rows, sourceImage.Columns];
+            int totalRemaining = (int)(layer.Rows * layer.Columns);
+            float[,] resultMatrix = new float[layer.Rows, layer.Columns];
             //In case of rescaling is true, this will record highest and lowest values
-            float maxValue = sourceImage[0, 0];
-            float minValue = sourceImage[0, 0];
+            float maxValue = layer[0, 0];
+            float minValue = layer[0, 0];
 
             // Create an array of threads
-            Thread[] threads = new Thread[numThreads];
+            Thread[] threads = new Thread[Environment.ProcessorCount];
+            int numThreads = threads.GetLength(0);
 
             // Calculate the number of rows each thread will process
-            int rowsPerThread = sourceImage.Rows / numThreads;
+            int rowsPerThread = (int)layer.Rows / numThreads;
 
             // Create a lock object
             object lockObject = new object();
@@ -72,18 +71,18 @@ namespace AppFiltros
             for (int t = 0; t < numThreads; t++)
             {
                 int startRow = t * rowsPerThread;
-                int endRow = (t == numThreads - 1) ? sourceImage.Rows : startRow + rowsPerThread;
+                int endRow = (t == numThreads - 1) ? (int)layer.Rows : startRow + rowsPerThread;
                 threads[t] = new Thread(() =>
                 {
                     for (int i = startRow; i < endRow; i++)
                     {
-                        for (int j = 0; j < sourceImage.Columns; j++)
+                        for (int j = 0; j < layer.Columns; j++)
                         {
                             //Console.WriteLine($"Calculating pixel {i},{j}");
                             float pixelValue;
                             lock (lockObject)
                             {
-                                pixelValue = CalculatePixel(sourceImage, i, j);
+                                pixelValue = CalculatePixel(layer, i, j);
                                 resultMatrix[i, j] = pixelValue;
                             }
                             //totalRemaining--;
@@ -109,28 +108,36 @@ namespace AppFiltros
                 thread.Join();
             }
 
-            Image output = new Image(sourceImage.Rows, sourceImage.Columns, 255, 0);
+            Layer output = new(layer.Type,layer.Rows, layer.Columns);
             if (applyRescaling && maxValue > 255 || minValue < 0)
             {
                 //Console.WriteLine($"Applying linear rescaling with range [{sourceImage.MinValue}:{sourceImage.MaxValue}]");
-                output.Pixels = Image.ApplyLinearTransform(resultMatrix, sourceImage.MaxValue, sourceImage.MinValue);
+                output.Pixels = Image.ApplyLinearTransform(resultMatrix, maxPixelValue, minPixelValue);
             }
             else
             {
-                Console.WriteLine($"Applying truncation with range [{sourceImage.MinValue}:{sourceImage.MaxValue}]");
-                output.Pixels = Image.TrunkValues(resultMatrix, sourceImage.MaxValue);
+                Console.WriteLine($"Applying truncation with range [{minPixelValue}:{maxPixelValue}]");
+                output.Pixels = Image.TrunkValues(resultMatrix, maxPixelValue);
             }
             return output;
         }
-
+        public Image ApplyFilter(Image image, bool applyRescaling = true, byte maxPixelValue = 255, byte minPixelValue = 0)
+        {
+            Layer[] layers = new Layer[image.LayerDepth];
+            for (int i = 0; i < image.LayerDepth; i++)
+            {
+                layers[i] = ApplyFilter(image[i], applyRescaling, maxPixelValue, minPixelValue);
+            }
+            return new Image(layers);
+        }
         /// <summary>
         /// Calcula el nuevo valor de un píxel, aplicando los factores de la máscara a los correspondientes en sourceImage
         /// </summary>
-        /// <param name="sourceImage"></param>
+        /// <param name="layer"></param>
         /// <param name="x"></param>
         /// <param name="y"></param>
         /// <returns>Nuevo valor del píxel.</returns>
-        private float CalculatePixel(Image sourceImage, int x, int y)
+        private float CalculatePixel(Layer layer, int x, int y)
         {
             float sum = 0;
             int d = (MaskSize - 1) / 2;
@@ -138,26 +145,20 @@ namespace AppFiltros
             int startY = y - d;
             int filterX = 0;
             int filterY = 0;
-            for (int i = startX; i <= x + d; i++)
+            for (uint i = (uint)startX; i <= x + d; i++)
             {
                 filterX = 0;
-                for (int j = startY; j <= y + d; j++)
+                for (uint j = (uint)startY; j <= y + d; j++)
                 {
-                    #if DEBUG
                     //Console.WriteLine($"\tCalculando pixel ({i}:{j})");
-                    #endif
                     try
                     {
-                        sum += sourceImage[i, j] * Factor * this[filterY, filterX];
-                        #if DEBUG
+                        sum += layer[i, j] * Factor * this[filterY, filterX];
                         //Console.WriteLine($"\t\t\t{sum}=({sourceImage[i, j]}*{Factor}*{this[filterY, filterX]})");
-                        #endif
                     }
                     catch (IndexOutOfRangeException)
                     {
-                        #if DEBUG
                         //Console.WriteLine("\tPosición no válida, pasando a la siguiente iteración...");
-                        #endif
                         continue;
                     }
                     filterX++;
