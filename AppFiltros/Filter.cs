@@ -51,45 +51,78 @@ namespace AppFiltros
         /// <returns></returns>
         public Image ApplyFilter(Image sourceImage, bool applyRescaling = true)
         {
-            float[,] resultMatrix = new float[sourceImage.Size, sourceImage.Size];
+            int totalPixels = sourceImage.Rows * sourceImage.Columns;
+            int totalRemaining = totalPixels;
+            int numThreads = Environment.ProcessorCount;
+            float[,] resultMatrix = new float[sourceImage.Rows, sourceImage.Columns];
             //In case of rescaling is true, this will record highest and lowest values
             float maxValue = sourceImage[0, 0];
             float minValue = sourceImage[0, 0];
-            for (byte i = 0; i < sourceImage.Size; i++)
+
+            // Create an array of threads
+            Thread[] threads = new Thread[numThreads];
+
+            // Calculate the number of rows each thread will process
+            int rowsPerThread = sourceImage.Rows / numThreads;
+
+            // Create a lock object
+            object lockObject = new object();
+
+            // Create and start a thread for each processor
+            for (int t = 0; t < numThreads; t++)
             {
-                for (byte j = 0; j < sourceImage.Size; j++)
+                int startRow = t * rowsPerThread;
+                int endRow = (t == numThreads - 1) ? sourceImage.Rows : startRow + rowsPerThread;
+                threads[t] = new Thread(() =>
                 {
-                    #if DEBUG
-                    Console.WriteLine($"Calculating pixel {i},{j}");
-                    #endif
-                    resultMatrix[i, j] = CalculatePixel(sourceImage, i, j);
-                    if (resultMatrix[i, j] > maxValue)
+                    for (int i = startRow; i < endRow; i++)
                     {
-                        maxValue = resultMatrix[i, j];
+                        for (int j = 0; j < sourceImage.Columns; j++)
+                        {
+                            //Console.WriteLine($"Calculating pixel {i},{j}");
+                            float pixelValue;
+                            lock (lockObject)
+                            {
+                                pixelValue = CalculatePixel(sourceImage, i, j);
+                                resultMatrix[i, j] = pixelValue;
+                            }
+                            //totalRemaining--;
+                            //Console.WriteLine($"Calculation: Remaining: {totalRemaining}");
+
+                            if (pixelValue > maxValue)
+                            {
+                                maxValue = pixelValue;
+                            }
+                            if (pixelValue < minValue)
+                            {
+                                minValue = pixelValue;
+                            }
+                        }
                     }
-                    if (resultMatrix[i, j] < minValue)
-                    {
-                        minValue = resultMatrix[i, j];
-                    }
-                }
+                });
+                threads[t].Start();
             }
-            Image output = new Image(sourceImage.Size, 255, 0);
+
+            // Wait for all threads to complete
+            foreach (Thread thread in threads)
+            {
+                thread.Join();
+            }
+
+            Image output = new Image(sourceImage.Rows, sourceImage.Columns, 255, 0);
             if (applyRescaling && maxValue > 255 || minValue < 0)
             {
-                #if DEBUG
-                Console.WriteLine($"Applying linear rescaling with range [{sourceImage.MinValue}:{sourceImage.MaxValue}]");
-                #endif
+                //Console.WriteLine($"Applying linear rescaling with range [{sourceImage.MinValue}:{sourceImage.MaxValue}]");
                 output.Pixels = Image.ApplyLinearTransform(resultMatrix, sourceImage.MaxValue, sourceImage.MinValue);
             }
             else
             {
-                #if DEBUG
                 Console.WriteLine($"Applying truncation with range [{sourceImage.MinValue}:{sourceImage.MaxValue}]");
-                #endif
                 output.Pixels = Image.TrunkValues(resultMatrix, sourceImage.MaxValue);
             }
             return output;
         }
+
         /// <summary>
         /// Calcula el nuevo valor de un píxel, aplicando los factores de la máscara a los correspondientes en sourceImage
         /// </summary>
@@ -111,19 +144,19 @@ namespace AppFiltros
                 for (int j = startY; j <= y + d; j++)
                 {
                     #if DEBUG
-                    Console.WriteLine($"\tCalculando pixel ({i}:{j})");
+                    //Console.WriteLine($"\tCalculando pixel ({i}:{j})");
                     #endif
                     try
                     {
                         sum += sourceImage[i, j] * Factor * this[filterY, filterX];
                         #if DEBUG
-                        Console.WriteLine($"\t\t\t{sum}=({sourceImage[i, j]}*{Factor}*{this[filterY, filterX]})");
+                        //Console.WriteLine($"\t\t\t{sum}=({sourceImage[i, j]}*{Factor}*{this[filterY, filterX]})");
                         #endif
                     }
                     catch (IndexOutOfRangeException)
                     {
                         #if DEBUG
-                        Console.WriteLine("\tPosición no válida, pasando a la siguiente iteración...");
+                        //Console.WriteLine("\tPosición no válida, pasando a la siguiente iteración...");
                         #endif
                         continue;
                     }

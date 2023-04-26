@@ -7,11 +7,73 @@ using System.Threading.Tasks;
 namespace AppFiltros
 {
     /// <summary>
+    /// Tipos de valor admisibles para <see cref="Layer"/>.
+    /// </summary>
+    public enum ValueType
+    {
+        R,          //Red
+        G,          //Green
+        B,          //Blue
+        A,          //Alpha
+        Grayscale   //Escala de grises
+
+    }
+
+    /// <summary>
+    /// Estructura que almacena una matriz de valores de rango [0:255] y admite varios tipos de valor. Ver <see cref="ValueType"/>
+    /// </summary>
+    public struct Layer
+    {
+        /// <summary>
+        /// Tipo de valores que esta instancia contiene.
+        /// </summary>
+        public ValueType Type { get; set; }
+        /// <summary>
+        /// Número de filas de la matriz de valores.
+        /// </summary>
+        public uint Rows { get; set; }
+        /// <summary>
+        /// Número de columnas de la matriz de valores.
+        /// </summary>
+        public uint Columns { get; set; }
+        /// <summary>
+        /// Matriz de valores.
+        /// </summary>
+        public byte[,] Pixels { get; set; }
+        public Layer(ValueType type, uint rows, uint columns)
+        {
+            Type = type;
+            Rows = rows;
+            Columns = columns;
+            Pixels = new byte[Rows, Columns];
+        }
+        public Layer(ValueType type, byte[,] pixelValues)
+        {
+            Type = type;
+            Pixels = pixelValues;
+            Rows = (uint)pixelValues.GetLength(0);
+            Columns = (uint)pixelValues.GetLength(1);
+        }
+        public byte this[uint x, uint y]
+        {
+            get { return Pixels[x, y]; }
+            set { Pixels[x, y] = value; }
+        }
+    }
+
+    /// <summary>
     /// Clase que contiene una imagen de profundidad máxima de 8 bits por pixel
     /// </summary>
     public class Image
     {
-        #region Fields and Constructors
+        /// <summary>
+        /// Numero de capas que componen a este objeto.
+        /// </summary>
+        public byte LayerDepth { get; set; }
+        /// <summary>
+        /// Objetos Layer contenidos
+        /// </summary>
+        public Layer[] Layers { get; set; }
         /// <summary>
         /// Matriz que contiene los pixeles de la imagen
         /// </summary>
@@ -19,7 +81,8 @@ namespace AppFiltros
         /// <summary>
         /// Dimensión de la imagen
         /// </summary>
-        public int Size { get; set; }
+        public int Rows { get; set; }
+        public int Columns { get; set; }
         /// <summary>
         /// Valor máximo admitido por pixel
         /// </summary>
@@ -28,20 +91,29 @@ namespace AppFiltros
         /// Valor mínimo admitido por pixel
         /// </summary>
         public byte MinValue { get; set; }
-        public Image(int size, byte maxValue = 255, byte minValue = 0)
+        public Image(int height, int width, byte maxValue = 255, byte minValue = 0)
         {
-            Size = size;
-            Pixels = new byte[size, size];
+            Rows = height;
+            Columns = width;
+            Pixels = new byte[Rows, Columns];
             MaxValue = maxValue;
             MinValue = minValue;
         }
         public Image(byte[,] matrix, byte maxValue = 255, byte minValue = 0)
         {
-            Size = matrix.GetLength(0);
+            Rows = matrix.GetLength(0);
+            Columns = matrix.GetLength(1);
             Pixels = matrix;
             MaxValue = maxValue;
             MinValue = minValue;
         }
+        /// <summary>
+        /// x: Rows
+        /// y: Columns
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <returns></returns>
         public byte this[int x, int y]
         {
             get
@@ -50,10 +122,9 @@ namespace AppFiltros
             }
             set
             {
-                Pixels[x, y] = value;
+                Pixels[x, y] = (byte)value;
             }
         }
-        #endregion
 
         /// <summary>
         /// Trunca los valores en una matriz de flotantes y devuelve una matriz de bytes.
@@ -63,16 +134,17 @@ namespace AppFiltros
         /// <returns>Matriz de bytes con valores truncados.</returns>
         public static byte[,] TrunkValues(float[,] matrix, int maxValue = 255)
         {
-            int matrixSize = matrix.GetLength(0);
-            byte[,] result = new byte[matrixSize, matrixSize];
+            int rows = matrix.GetLength(0);
+            int columns = matrix.GetLength(1);
+            byte[,] result = new byte[rows, columns];
 
-            for (int i = 0; i < matrixSize; i++)
+            for (int i = 0; i < rows; i++)
             {
-                for (int j = 0; j < matrixSize; j++)
+                for (int j = 0; j < columns; j++)
                 {
                     result[i, j] = (byte)(Math.Round(matrix[i, j]) % maxValue);
 #if DEBUG
-                    Console.WriteLine($"Truncating: Modulo of {matrix[i, j]} by {maxValue} is {result[i, j]}");
+					Console.WriteLine($"Truncating: Modulo of {matrix[i, j]} by {maxValue} is {result[i, j]}");
 #endif
                 }
             }
@@ -89,8 +161,11 @@ namespace AppFiltros
         /// <returns>Matriz de bytes con valores transformados.</returns>
         public static byte[,] ApplyLinearTransform(float[,] matrix, int matrixMaxValue, int matrixMinValue, byte MaxValue = 255, byte MinValue = 0)
         {
-            int size = matrix.GetLength(0);
-            byte[,] result = new byte[size, size];
+            int numThreads = Environment.ProcessorCount;
+            int rows = matrix.GetLength(0);
+            int columns = matrix.GetLength(1);
+            int totalRemaining = rows * columns;
+            byte[,] result = new byte[rows, columns];
 
             if (matrixMaxValue == matrixMinValue)
             {
@@ -100,15 +175,39 @@ namespace AppFiltros
             {
                 double scalingFactor = (MaxValue - MinValue) / (double)(matrixMaxValue - matrixMinValue);
 
-                for (int i = 0; i < size; i++)
+                // Create an array of threads
+                Thread[] threads = new Thread[numThreads];
+
+                // Calculate the number of rows each thread will process
+                int rowsPerThread = rows / numThreads;
+
+                // Create and start a thread for each processor
+                for (int t = 0; t < numThreads; t++)
                 {
-                    for (int j = 0; j < size; j++)
+                    int startRow = t * rowsPerThread;
+                    int endRow = (t == numThreads - 1) ? rows : startRow + rowsPerThread;
+                    threads[t] = new Thread(() =>
                     {
-                        float val = matrix[i, j];
-                        int transformedVal = (int)(scalingFactor * (val - matrixMinValue));
-                        transformedVal = Math.Max(MinValue, Math.Min(MaxValue, transformedVal));
-                        result[i, j] = (byte)transformedVal;
-                    }
+                        for (int i = startRow; i < endRow; i++)
+                        {
+                            for (int j = 0; j < columns; j++)
+                            {
+                                float val = matrix[i, j];
+                                int transformedVal = (int)(scalingFactor * (val - matrixMinValue));
+                                transformedVal = Math.Max(MinValue, Math.Min(MaxValue, transformedVal));
+                                result[i, j] = (byte)transformedVal;
+                                //totalRemaining--;
+                                //Console.WriteLine($"Rescaling: Remaining: {totalRemaining}");
+                            }
+                        }
+                    });
+                    threads[t].Start();
+                }
+
+                // Wait for all threads to complete
+                foreach (Thread thread in threads)
+                {
+                    thread.Join();
                 }
             }
             return result;
@@ -118,9 +217,9 @@ namespace AppFiltros
         /// </summary>
         public void Print()
         {
-            for (int i = 0; i < Size; i++)
+            for (int i = 0; i < Rows; i++)
             {
-                for (int j = 0; j < Size; j++)
+                for (int j = 0; j < Columns; j++)
                 {
                     Console.Write(Pixels[i, j] + "\t");
                 }

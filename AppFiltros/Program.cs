@@ -1,33 +1,38 @@
 ﻿using System.Diagnostics;
+
 namespace AppFiltros
 {
     internal class Program
     {
         static void Main(string[] args)
         {
+            //new log file
+            //start counting time elapsed
+            var watch = Stopwatch.StartNew();
             #region Test de mediana
-            Image myImage = new(5, 7, 0)
-            {
-                Pixels = new byte[,]
-            {
-                {2,2,2,3,3},
-                {2,6,2,3,0},
-                {3,3,3,5,5},
-                {2,2,2,4,4},
-                {2,7,2,4,0}
-            }
-            };
+            string path = "cyno.png";
+            //string path = @"C:\Users\Diego\Pictures\Screenshots\002.png";
+            Image myImage = FileIO.GetImage(path);
             Filter filter = new(3, new float[,]
             {
                 {1,1,1},
-                {1,1,1},
+                {1,-8,1},
                 {1,1,1}
-            }, true, (float)1 / 9);
-            myImage.Print();
+            },false, 1);
+            //myImage.Print();
             Image result = filter.ApplyFilter(myImage, false);
             Console.WriteLine("\n");
-            result.Print();
+            //result.Print();
+            FileIO.WriteImage(result);
             #endregion
+
+            //Print resources used
+            Console.WriteLine($"Memory used: {Process.GetCurrentProcess().WorkingSet64 / 1024} KB");
+            //Print time elapsed
+            watch.Stop();
+            Console.WriteLine($"Time elapsed: {watch.ElapsedMilliseconds} ms");
+            Console.ReadKey();
+
         }
 
     }
