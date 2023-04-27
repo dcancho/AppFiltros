@@ -53,8 +53,6 @@ namespace AppFiltros
             Factor = factor;
         }
 
-        #endregion
-
 
         /// <summary>
         /// Aplicar este filtro a una imagen sourceImage y devuelve una nueva imagen con el resultado.
