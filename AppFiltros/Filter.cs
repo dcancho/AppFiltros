@@ -43,6 +43,19 @@ namespace AppFiltros
                 Mask[x, y] = value;
             }
         }
+        
+        public Filter(float[] maskArray, bool applyFactor = true, float factor = 1)
+        {
+            var output = GetMatrix(maskArray);
+            Mask = output.Item1;
+            MaskSize = output.Item2;
+            ApplyFactor = applyFactor;
+            Factor = factor;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// Aplicar este filtro a una imagen sourceImage y devuelve una nueva imagen con el resultado.
         /// </summary>
@@ -165,6 +178,131 @@ namespace AppFiltros
                 filterY++;
             }
             return sum;
+        }
+
+        /// <summary>
+        /// Trunca los valores de <paramref name="matrix"/> a un rango de 0 a <paramref name="maxValue"/>. 255 por defecto.
+        /// </summary>
+        /// <param name="matrix"></param>
+        /// <param name="maxValue"></param>
+        /// <returns></returns>
+        private static byte[,] TrunkValues(float[,] matrix, int maxValue = 255)
+        {
+            int rows = matrix.GetLength(0);
+            int columns = matrix.GetLength(1);
+            byte[,] result = new byte[rows, columns];
+
+            // Determine the number of threads to use
+            int numThreads = Environment.ProcessorCount;
+            int rowsPerThread = rows / numThreads;
+
+            // Create and start the threads
+            Thread[] threads = new Thread[numThreads];
+            for (int t = 0; t < numThreads; t++)
+            {
+                int startRow = t * rowsPerThread;
+                int endRow = (t == numThreads - 1) ? rows : startRow + rowsPerThread;
+                threads[t] = new Thread(() => TrunkValuesThread(matrix, result, startRow, endRow, columns, maxValue));
+                threads[t].Start();
+            }
+
+            // Wait for all threads to complete
+            for (int t = 0; t < numThreads; t++)
+                threads[t].Join();
+
+            return result;
+        }
+
+
+        private static void TrunkValuesThread(float[,] matrix, byte[,] result, int startRow, int endRow, int columns, int maxValue)
+        {
+            for (int i = startRow; i < endRow; i++)
+            {
+                for (int j = 0; j < columns; j++)
+                {
+                    result[i, j] = (byte)(Math.Round(matrix[i, j]) % maxValue);
+                    //Console.WriteLine($"Truncating: Modulo of {matrix[i, j]} by {maxValue} is {result[i, j]}");
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Aplica una transformación lineal a los valores en una matriz de flotantes para ajustarlos a un rango especificado.
+        /// </summary>
+        /// <param name="matrix">Matriz de flotantes a transformar.</param>
+        /// <param name="matrixMaxValue">Valor máximo en la matriz de entrada.</param>
+        /// <param name="matrixMinValue">Valor mínimo en la matriz de entrada.</param>
+        /// <param name="MaxValue">Valor máximo del rango de salida.</param>
+        /// <param name="MinValue">Valor mínimo del rango de salida.</param>
+        /// <returns>Matriz de bytes con valores transformados.</returns>
+        private static byte[,] ApplyLinearTransform(float[,] matrix, int matrixMaxValue, int matrixMinValue, byte MaxValue = 255, byte MinValue = 0)
+        {
+            int numThreads = Environment.ProcessorCount;
+            int rows = matrix.GetLength(0);
+            int columns = matrix.GetLength(1);
+            int totalRemaining = rows * columns;
+            byte[,] result = new byte[rows, columns];
+
+            if (matrixMaxValue == matrixMinValue)
+            {
+                throw new ArgumentException("Max and min values are the same");
+            }
+            else
+            {
+                double scalingFactor = (MaxValue - MinValue) / (double)(matrixMaxValue - matrixMinValue);
+
+                // Create an array of threads
+                Thread[] threads = new Thread[numThreads];
+
+                // Calculate the number of rows each thread will process
+                int rowsPerThread = rows / numThreads;
+
+                // Create and start a thread for each processor
+                for (int t = 0; t < numThreads; t++)
+                {
+                    int startRow = t * rowsPerThread;
+                    int endRow = (t == numThreads - 1) ? rows : startRow + rowsPerThread;
+                    threads[t] = new Thread(() =>
+                    {
+                        for (int i = startRow; i < endRow; i++)
+                        {
+                            for (int j = 0; j < columns; j++)
+                            {
+                                float val = matrix[i, j];
+                                int transformedVal = (int)(scalingFactor * (val - matrixMinValue));
+                                transformedVal = Math.Max(MinValue, Math.Min(MaxValue, transformedVal));
+                                result[i, j] = (byte)transformedVal;
+                                //totalRemaining--;
+                                //Console.WriteLine($"Rescaling: Remaining: {totalRemaining}");
+                            }
+                        }
+                    });
+                    threads[t].Start();
+                }
+
+                // Wait for all threads to complete
+                foreach (Thread thread in threads)
+                {
+                    thread.Join();
+                }
+            }
+            return result;
+        }
+
+        private static (float[,],int) GetMatrix(float[] array)
+        {
+            float[,] matrix;
+            int size = (int)Math.Sqrt(array.GetLength(0));
+            matrix = new float[size, size];
+            for (int i = 0; i < size; i++)
+            {
+                for (int j = 0; j < size; j++)
+                {
+                    matrix[i, j] = array[i * size + j];
+                }
+            }
+            return (matrix, size);
         }
     }
 }
