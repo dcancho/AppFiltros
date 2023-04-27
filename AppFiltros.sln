@@ -7,8 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppFiltros", "AppFiltros\Ap
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Pixela", "FilterApp\Pixela.csproj", "{88815114-F864-47B9-8616-323CD98A30DD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppFiltrosTest", "AppFiltrosTest\AppFiltrosTest.csproj", "{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,18 +41,6 @@ Global
 		{88815114-F864-47B9-8616-323CD98A30DD}.Release|ARM32.Build.0 = Release|Any CPU
 		{88815114-F864-47B9-8616-323CD98A30DD}.Release|x64.ActiveCfg = Release|Any CPU
 		{88815114-F864-47B9-8616-323CD98A30DD}.Release|x64.Build.0 = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|ARM32.ActiveCfg = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|ARM32.Build.0 = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Debug|x64.Build.0 = Debug|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|ARM32.ActiveCfg = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|ARM32.Build.0 = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|x64.ActiveCfg = Release|Any CPU
-		{92536AE8-B5FE-469E-B6CD-AA1E1B241C0C}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

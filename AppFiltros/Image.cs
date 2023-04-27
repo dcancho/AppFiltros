@@ -129,8 +129,10 @@ namespace AppFiltros
         /// <summary>
         /// Trunca los valores en una matriz de flotantes y devuelve una matriz de bytes.
         /// </summary>
-        /// <param name="path"></param>
-        public void Save(string path)
+        /// <param name="matrix">Matriz de flotantes a truncar.</param>
+        /// <param name="maxValue">Valor máximo para truncar.</param>
+        /// <returns>Matriz de bytes con valores truncados.</returns>
+        public static byte[,] TrunkValues(float[,] matrix, int maxValue = 255)
         {
             int rows = matrix.GetLength(0);
             int columns = matrix.GetLength(1);
@@ -148,7 +150,6 @@ namespace AppFiltros
             }
             return result;
         }
-
         /// <summary>
         /// Aplica una transformación lineal a los valores en una matriz de flotantes para ajustarlos a un rango especificado.
         /// </summary>
@@ -211,23 +212,14 @@ namespace AppFiltros
             }
             return result;
         }
-        public void GetImage(string path, bool keepColor)
+        /// <summary>
+        /// Imprime la imagen en consola.
+        /// </summary>
+        public void Print()
         {
-            Layer[] layers;
-            using (Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(path))
+            for (int i = 0; i < Rows; i++)
             {
-                Rgba32[,] pixels = ReadPixelValues(image);
-                Layer[] extractedLayers = new Layer[4];
-                for (int i = 0; i < 4; i++)
-                {
-                    extractedLayers[i] = ExtractValuesToLayer(pixels, i);
-                }
-                if (!keepColor)
-                {
-                    layers = new Layer[1];
-                    layers[0] = ToBlackWhite(extractedLayers);
-                }
-                else
+                for (int j = 0; j < Columns; j++)
                 {
                     Console.Write(Pixels[i, j] + "\t");
                 }
